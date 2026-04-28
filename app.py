@@ -1,54 +1,113 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="小仙女守护计划", page_icon="🌹")
+# 设置页面
+st.set_page_config(page_title="小仙女守护计划", page_icon="🌹", layout="centered")
 
-st.markdown("""
-<style>
-.main { background-color: #fffafb; }
-.stRadio > label { font-weight: bold; color: #e91e63; }
-h1 { color: #e91e63; text-align: center; }
-div[data-testid="stMetricValue"] { color: #e91e63; }
-</style>
-""", unsafe_allow_html=True)
+# 标题
+st.title("🌹 小仙女姨妈期大作战")
 
-st.title("🌹 小仙女姨妈期守护计划")
-st.write("""
-<div style='text-align: center; color: #666; font-size: 1.1em;'>
-    系统检测到：当前身体处于“大姨妈”状态。<br>
-    你的任务是：做出选择，让身体舒适度回升！
+# 关卡 1：文字互动
+with st.expander("第一关：暖心选择题", expanded=True):
+    st.write("做出你的选择，提升身体舒适度...")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🌡️ 抱个暖宝宝"):
+            st.toast("肚子暖暖的，舒服多了！", icon='❤️')
+    with col2:
+        if st.button("🍵 喝杯燕麦奶"):
+            st.toast("温热的液体治愈了心情~", icon='🥛')
+
+st.write("---")
+
+# 关卡 2：马里奥小游戏
+st.subheader("第二关：超级玛丽——击退负能量！")
+st.caption("🎮 电脑操作：左右键移动，空格跳跃。吃到右侧的 ☕ 即可通关！")
+
+# 游戏代码
+mario_game_js = """
+<div style="display: flex; justify-content: center;">
+    <canvas id="gameCanvas" width="500" height="250" style="border:3px solid #ffafcc; border-radius:15px; background: #fffafb; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></canvas>
 </div>
-""", unsafe_allow_html=True)
-st.write("---")
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-st.subheader("📍 场景 1：现在肚子有点闷闷的，你打算？")
-c1 = st.radio("请做出选择：", ["请选择...", "A. 喝一杯冰美式提提神", "B. 抱个暖宝宝，喝杯暖暖的饮品"], key="q1")
+    let player = { x: 30, y: 190, width: 25, height: 25, dy: 0, jumpPower: -10, gravity: 0.5, grounded: false };
+    let enemies = [
+        { x: 200, y: 215, text: "腰酸", speed: 1.5 },
+        { x: 400, y: 215, text: "小烦躁", speed: 2 }
+    ];
+    let goal = { x: 460, y: 205, text: "☕" };
+    let keys = {};
 
-st.subheader("📍 场景 2：心情突然有点莫名的小烦躁，怎么办？")
-c2 = st.radio("请做出选择：", ["请选择...", "A. 找男朋友撒个娇", "B. 憋在心里，自己刷手机"], key="q2")
+    window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'Space') e.preventDefault(); });
+    window.addEventListener('keyup', e => keys[e.code] = false);
 
-st.subheader("📍 场景 3：晚餐时间到了，你想吃什么？")
-c3 = st.radio("请做出选择：", ["请选择...", "A. 麻辣火锅，一定要爆辣！", "B. 清淡温和的热汤面"], key="q3")
+    function update() {
+        if (keys['ArrowLeft'] && player.x > 0) player.x -= 4;
+        if (keys['ArrowRight'] && player.x < 475) player.x += 4;
+        if (keys['Space'] && player.grounded) {
+            player.dy = player.jumpPower;
+            player.grounded = false;
+        }
 
-st.write("---")
+        player.dy += player.gravity;
+        player.y += player.dy;
 
-if st.button("✨ 生成舒适度报告 ✨"):
-    if "请选择..." in [c1, c2, c3]:
-        st.error("请先完成所有选择哦！")
-    else:
-        score = 50
-        if "B" in c1: score += 20
-        elif "A" in c1: score -= 20
-        if "A" in c2: score += 30
-        elif "B" in c2: score -= 10
-        if "B" in c3: score += 20
-        elif "A" in c3: score -= 15
+        if (player.y > 190) {
+            player.y = 190;
+            player.dy = 0;
+            player.grounded = true;
+        }
+
+        enemies.forEach(en => {
+            en.x -= en.speed;
+            if (en.x < -50) en.x = 550;
+            if (Math.abs(player.x - en.x) < 20 && Math.abs(player.y - en.y) < 20) {
+                player.x = 30; // 撞到敌人回起点
+            }
+        });
+
+        if (player.x > 450) {
+            alert("✨ 挑战成功！负能量全被你踩扁啦！快去找男朋友领奖品！✨");
+            player.x = 30;
+        }
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        st.metric(label="最终身体舒适度", value=f"{score}%")
-        
-        if score >= 80:
-            st.balloons()
-            st.success("🏆 恭喜获得【头等宠爱】奖牌！")
-            st.write("**男朋友留言：** 辛苦啦！我知道最近备考压力大，我想紧紧抱住我的宝贝，给你满满的爱 ❤️")
-        else:
-            st.warning("⚠️ 警告：检测到身体舒适度较低！")
-            st.write("**男朋友留言：** 乖，快放下手机，让我给你揉揉肚子，或者抱抱你。")
+        // 装饰背景
+        ctx.fillStyle = "#ffc107";
+        ctx.fillRect(0, 215, 500, 35); // 地板
+
+        // 玩家 (画成一个小粉方块)
+        ctx.fillStyle = "#ff85a1";
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+        ctx.fillStyle = "white";
+        ctx.font = "10px Arial";
+        ctx.fillText("你", player.x + 8, player.y + 17);
+
+        // 敌人
+        ctx.fillStyle = "#555";
+        ctx.font = "14px Arial";
+        enemies.forEach(en => {
+            ctx.fillText("👾 " + en.text, en.x, en.y);
+        });
+
+        // 终点
+        ctx.font = "24px Arial";
+        ctx.fillText(goal.text, goal.x, goal.y);
+    }
+    update();
+</script>
+"""
+
+components.html(mario_game_js, height=300)
+
+st.write("---")
+st.info("💡 提示：这是一个属于你的避风港，不舒服的时候就来踩扁那些负能量吧！")
