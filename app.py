@@ -2,112 +2,225 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # 设置页面
-st.set_page_config(page_title="小仙女守护计划", page_icon="🌹", layout="centered")
+st.set_page_config(page_title="小仙女守护计划 2.0", page_icon="💖", layout="centered")
 
-# 标题
-st.title("🌹 小仙女姨妈期大作战")
+# 自定义 CSS 美化 Streamlit 原生组件
+st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(180deg, #fff5f8 0%, #ffe3ec 100%);
+    }
+    h1 {
+        color: #ff4d6d;
+        font-family: 'Microsoft YaHei', sans-serif;
+        text-align: center;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    .stMarkdown {
+        text-align: center;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# 关卡 1：文字互动
-with st.expander("第一关：暖心选择题", expanded=True):
-    st.write("做出你的选择，提升身体舒适度...")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🌡️ 抱个暖宝宝"):
-            st.toast("肚子暖暖的，舒服多了！", icon='❤️')
-    with col2:
-        if st.button("🍵 喝杯燕麦奶"):
-            st.toast("温热的液体治愈了心情~", icon='🥛')
+st.title("💖 守护小仙女：击退姨妈大作战")
+st.write("避开那些烦人的‘紫乌龟’，跳上云端，去找门后等你的那个拥抱吧！")
 
-st.write("---")
-
-# 关卡 2：马里奥小游戏
-st.subheader("第二关：超级玛丽——击退负能量！")
-st.caption("🎮 电脑操作：左右键移动，空格跳跃。吃到右侧的 ☕ 即可通关！")
-
-# 游戏代码
-mario_game_js = """
-<div style="display: flex; justify-content: center;">
-    <canvas id="gameCanvas" width="500" height="250" style="border:3px solid #ffafcc; border-radius:15px; background: #fffafb; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></canvas>
+# 核心游戏组件
+game_html = """
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+    <canvas id="gameCanvas" width="600" height="400" style="border:5px solid #ff8fa3; border-radius:20px; background: #87CEEB; box-shadow: 0 10px 30px rgba(0,0,0,0.1);"></canvas>
+    <div id="status" style="color: #ff4d6d; font-weight: bold; font-size: 1.2em; height: 30px;"></div>
 </div>
+
 <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const statusDiv = document.getElementById('status');
 
-    let player = { x: 30, y: 190, width: 25, height: 25, dy: 0, jumpPower: -10, gravity: 0.5, grounded: false };
-    let enemies = [
-        { x: 200, y: 215, text: "腰酸", speed: 1.5 },
-        { x: 400, y: 215, text: "小烦躁", speed: 2 }
-    ];
-    let goal = { x: 460, y: 205, text: "☕" };
-    let keys = {};
+// 游戏状态
+let gameState = 'playing'; // playing, win
+let alpha = 0; // 用于最后的渐变动画
 
-    window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'Space') e.preventDefault(); });
-    window.addEventListener('keyup', e => keys[e.code] = false);
+// 玩家设置
+let player = {
+    x: 50, y: 300, width: 35, height: 35,
+    dx: 0, dy: 0, 
+    speed: 5, jumpPower: -12, 
+    gravity: 0.6, grounded: false
+};
 
-    function update() {
-        if (keys['ArrowLeft'] && player.x > 0) player.x -= 4;
-        if (keys['ArrowRight'] && player.x < 475) player.x += 4;
-        if (keys['Space'] && player.grounded) {
+// 平台设置 (x, y, width, height)
+let platforms = [
+    { x: 0, y: 370, w: 600, h: 30 },   // 地面
+    { x: 150, y: 280, w: 120, h: 20 }, // 平台1
+    { x: 350, y: 200, w: 120, h: 20 }, // 平台2
+    { x: 100, y: 150, w: 100, h: 20 }, // 平台3
+    { x: 480, y: 120, w: 120, h: 20 }  // 终点平台
+];
+
+// 敌人设置 (紫色小乌龟)
+let enemies = [
+    { x: 160, y: 250, w: 30, h: 30, range: 100, startX: 160, dir: 1, speed: 2 },
+    { x: 360, y: 170, w: 30, h: 30, range: 80, startX: 360, dir: 1, speed: 3 }
+];
+
+// 终点门
+let door = { x: 540, y: 70, w: 40, h: 50 };
+
+let keys = {};
+window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if(['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+function update() {
+    if (gameState === 'playing') {
+        // 左右移动
+        if (keys['ArrowLeft']) player.x -= player.speed;
+        if (keys['ArrowRight']) player.x += player.speed;
+        
+        // 跳跃
+        if ((keys['Space'] || keys['ArrowUp']) && player.grounded) {
             player.dy = player.jumpPower;
             player.grounded = false;
         }
 
+        // 重力
         player.dy += player.gravity;
         player.y += player.dy;
+        player.grounded = false;
 
-        if (player.y > 190) {
-            player.y = 190;
-            player.dy = 0;
-            player.grounded = true;
-        }
-
-        enemies.forEach(en => {
-            en.x -= en.speed;
-            if (en.x < -50) en.x = 550;
-            if (Math.abs(player.x - en.x) < 20 && Math.abs(player.y - en.y) < 20) {
-                player.x = 30; // 撞到敌人回起点
+        // 碰撞检测：平台
+        platforms.forEach(p => {
+            if (player.x < p.x + p.w && player.x + player.width > p.x &&
+                player.y < p.y + p.h && player.y + player.height > p.y) {
+                if (player.dy > 0 && player.y + player.height - player.dy <= p.y) {
+                    player.y = p.y - player.height;
+                    player.dy = 0;
+                    player.grounded = true;
+                }
             }
         });
 
-        if (player.x > 450) {
-            alert("✨ 挑战成功！负能量全被你踩扁啦！快去找男朋友领奖品！✨");
-            player.x = 30;
-        }
-
-        draw();
-        requestAnimationFrame(update);
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // 装饰背景
-        ctx.fillStyle = "#ffc107";
-        ctx.fillRect(0, 215, 500, 35); // 地板
-
-        // 玩家 (画成一个小粉方块)
-        ctx.fillStyle = "#ff85a1";
-        ctx.fillRect(player.x, player.y, player.width, player.height);
-        ctx.fillStyle = "white";
-        ctx.font = "10px Arial";
-        ctx.fillText("你", player.x + 8, player.y + 17);
-
-        // 敌人
-        ctx.fillStyle = "#555";
-        ctx.font = "14px Arial";
+        // 敌人移动与检测
         enemies.forEach(en => {
-            ctx.fillText("👾 " + en.text, en.x, en.y);
+            en.x += en.dir * en.speed;
+            if (Math.abs(en.x - en.startX) > en.range) en.dir *= -1;
+
+            if (Math.abs(player.x - en.x) < 25 && Math.abs(player.y - en.y) < 25) {
+                player.x = 50; player.y = 300; // 回到起点
+                statusDiv.innerText = "哎呀，被姨妈痛抓住了！加油！";
+                setTimeout(() => { statusDiv.innerText = ""; }, 2000);
+            }
         });
 
-        // 终点
-        ctx.font = "24px Arial";
-        ctx.fillText(goal.text, goal.x, goal.y);
+        // 边界限制
+        if (player.x < 0) player.x = 0;
+        if (player.x > 565) player.x = 565;
+
+        // 检测开门
+        if (player.x + player.width > door.x && player.y < door.y + door.h && player.y + player.height > door.y) {
+            gameState = 'transition';
+        }
     }
-    update();
+    draw();
+    requestAnimationFrame(update);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 画云朵背景
+    ctx.fillStyle = "white";
+    ctx.beginPath(); ctx.arc(100, 80, 30, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(130, 80, 40, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(400, 50, 25, 0, Math.PI*2); ctx.fill();
+
+    // 画平台
+    ctx.fillStyle = "#ffafcc";
+    platforms.forEach(p => {
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.strokeStyle = "#ff8fa3";
+        ctx.strokeRect(p.x, p.y, p.w, p.h);
+    });
+
+    // 画紫色乌龟 (简易版)
+    enemies.forEach(en => {
+        ctx.fillStyle = "#9d4edd"; // 紫色
+        ctx.beginPath();
+        ctx.arc(en.x + 15, en.y + 15, 15, Math.PI, 0); // 龟壳
+        ctx.fill();
+        ctx.fillStyle = "#7b2cbf";
+        ctx.fillRect(en.x + 5, en.y + 15, 20, 10); // 身体
+    });
+
+    // 画门
+    ctx.fillStyle = "#8d4925"; // 门框
+    ctx.fillRect(door.x, door.y, door.w, door.h);
+    ctx.fillStyle = "#b5651d"; // 门面
+    ctx.fillRect(door.x+5, door.y+5, door.w-10, door.h-5);
+    ctx.fillStyle = "yellow"; // 门把手
+    ctx.beginPath(); ctx.arc(door.x + 10, door.y + 30, 3, 0, Math.PI*2); ctx.fill();
+
+    // 画玩家 (带蝴蝶结的小红人)
+    ctx.fillStyle = "#ff4d6d";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    ctx.fillStyle = "white";
+    ctx.fillRect(player.x + 5, player.y + 8, 8, 8); // 眼1
+    ctx.fillRect(player.x + 22, player.y + 8, 8, 8); // 眼2
+    ctx.fillStyle = "black";
+    ctx.fillRect(player.x + 8, player.y + 11, 3, 3); 
+    ctx.fillRect(player.x + 25, player.y + 11, 3, 3);
+    // 蝴蝶结
+    ctx.fillStyle = "#ff0000";
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y); ctx.lineTo(player.x-10, player.y-10); ctx.lineTo(player.x, player.y-10); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(player.x+player.width, player.y); ctx.lineTo(player.x+player.width+10, player.y-10); ctx.lineTo(player.x+player.width, player.y-10); ctx.fill();
+
+    // 结局转场动画
+    if (gameState === 'transition') {
+        alpha += 0.02;
+        ctx.fillStyle = `rgba(255, 245, 248, ${alpha})`;
+        ctx.fillRect(0, 0, 600, 400);
+        if (alpha >= 1) gameState = 'win';
+    }
+
+    if (gameState === 'win') {
+        ctx.fillStyle = "#fff5f8";
+        ctx.fillRect(0, 0, 600, 400);
+        
+        // 画出拥抱的场景 (简易插画)
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ff4d6d";
+        ctx.font = "bold 30px Arial";
+        ctx.fillText("你推开了那扇门...", 300, 100);
+        
+        // 男朋友形象 (简笔画)
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = "#4361ee"; // 蓝色代表男朋友
+        ctx.beginPath();
+        ctx.arc(300, 180, 25, 0, Math.PI*2); // 头
+        ctx.moveTo(300, 205); ctx.lineTo(300, 280); // 身体
+        // 张开的双臂
+        ctx.moveTo(300, 220); ctx.lineTo(250, 190); 
+        ctx.moveTo(300, 220); ctx.lineTo(350, 190);
+        ctx.stroke();
+
+        ctx.font = "24px Arial";
+        ctx.fillText("❤️ 男朋友在这里给你一个大大的拥抱 ❤️", 300, 340);
+        ctx.font = "18px Arial";
+        ctx.fillStyle = "#666";
+        ctx.fillText("“辛苦啦，小仙女，我会一直陪着你的。”", 300, 370);
+    }
+}
+
+update();
 </script>
 """
 
-components.html(mario_game_js, height=300)
+components.html(game_html, height=480)
 
 st.write("---")
-st.info("💡 提示：这是一个属于你的避风港，不舒服的时候就来踩扁那些负能量吧！")
+st.caption("操作说明：键盘左右键移动，空格或上方向键跳跃。")
