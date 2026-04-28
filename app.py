@@ -2,60 +2,86 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # 设置页面
-st.set_page_config(page_title="解压乒乓大作战", page_icon="🏓", layout="centered")
+st.set_page_config(page_title="大姨妈大作战 2.0", page_icon="🏓", layout="centered")
 
-st.title("🏓 反弹吧！压力退散")
-st.write("控制下方的小粉板，把“医考压力”狠狠打回去！")
+st.title("🏓 击退大姨妈：仙女学霸保卫战")
+st.write("用你超长的“无敌木板”，把那个讨厌的“大姨妈”打飞！先赢三局就胜利哦！")
 
 # 乒乓游戏 HTML/JS 逻辑
 pong_html = """
 <div style="display: flex; justify-content: center; flex-direction: column; align-items: center;">
-    <div style="display: flex; justify-content: space-between; width: 400px; margin-bottom: 10px; font-family: 'Microsoft YaHei', sans-serif; font-size: 1.2em; font-weight: bold;">
-        <span style="color: #4361ee;">医考压力怪: <span id="aiScore">0</span></span>
+    <div id="game-ui" style="display: flex; justify-content: space-between; width: 400px; margin-bottom: 10px; font-family: 'Microsoft YaHei', sans-serif; font-size: 1.2em; font-weight: bold;">
+        <span style="color: #4361ee;">大姨妈: <span id="aiScore">0</span></span>
         <span style="color: #ff4d6d;">仙女学霸: <span id="playerScore">0</span></span>
     </div>
-    <canvas id="pongCanvas" width="400" height="500" style="border: 4px solid #ffafcc; border-radius: 10px; background: #fff5f8; box-shadow: 0 4px 10px rgba(0,0,0,0.1);"></canvas>
+    <div id="game-container" style="position: relative;">
+        <canvas id="pongCanvas" width="400" height="500" style="border: 4px solid #ffafcc; border-radius: 10px; background: #fff5f8; box-shadow: 0 4px 10px rgba(0,0,0,0.1);"></canvas>
+        <div id="overlay" style="position: absolute; top: 0; left: 0; width: 400px; height: 500px; background: rgba(255,255,255,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; border-radius: 10px;">
+            <h2 id="result-title" style="color: #ff4d6d;"></h2>
+            <p id="result-msg" style="padding: 20px; color: #666;"></p>
+            <button onclick="location.reload()" style="padding: 10px 20px; background: #ff4d6d; color: white; border: none; border-radius: 5px; cursor: pointer;">再玩一局</button>
+        </div>
+    </div>
 </div>
 
 <script>
 const canvas = document.getElementById('pongCanvas');
 const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const resultTitle = document.getElementById('result-title');
+const resultMsg = document.getElementById('result-msg');
 
-// 玩家和AI的木板属性
-const player = { x: 150, y: 470, w: 100, h: 12, color: '#ff4d6d', score: 0, speed: 6 };
-const ai = { x: 150, y: 18, w: 100, h: 12, color: '#4361ee', score: 0, speed: 3.5 };
-const ball = { x: 200, y: 250, r: 8, speed: 5, dx: 3, dy: 4, color: '#e5989b' };
+// 游戏配置
+const winScore = 3;
+let isGameOver = false;
+
+// 木板属性：玩家 100px, 对方 50px (两倍长度)
+const player = { x: 150, y: 470, w: 100, h: 12, color: '#ff4d6d', score: 0, speed: 8 };
+const ai = { x: 175, y: 18, w: 50, h: 12, color: '#4361ee', score: 0, speed: 4 };
+
+// 球的初始属性
+let initialBallSpeed = 4;
+const ball = { x: 200, y: 250, r: 8, speed: initialBallSpeed, dx: 3, dy: 3, color: '#e5989b' };
 
 let keys = {};
 window.addEventListener('keydown', e => { 
     keys[e.code] = true; 
-    if(['ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); 
+    if(['ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault(); 
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
 function resetBall(scorer) {
     ball.x = canvas.width / 2;
     ball.y = canvas.height / 2;
-    ball.speed = 5; // 重置速度
-    // 如果玩家得分，球发给AI；如果AI得分，球发给玩家
-    ball.dy = scorer === 'player' ? -4 : 4;
-    ball.dx = 3 * (Math.random() > 0.5 ? 1 : -1);
+    ball.speed = initialBallSpeed; // 重置球速
+    ball.dy = scorer === 'player' ? -initialBallSpeed : initialBallSpeed;
+    ball.dx = (Math.random() > 0.5 ? 1 : -1) * initialBallSpeed;
+}
+
+function endGame(winner) {
+    isGameOver = true;
+    overlay.style.display = 'flex';
+    if (winner === 'player') {
+        resultTitle.innerText = "🏆 你赢了！";
+        resultMsg.innerHTML = "哪怕是大姨妈也挡不住仙女学霸的威力！<br>辛苦啦，现在放下手机，让男朋友来照顾你吧 ❤️";
+    } else {
+        resultTitle.innerText = "哎呀，差一点点！";
+        resultMsg.innerText = "大姨妈这次有点凶，快呼叫男朋友来帮你揉揉肚子！";
+    }
 }
 
 function update() {
-    // 玩家移动 (左右方向键)
+    if (isGameOver) return;
+
+    // 玩家移动
     if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
     if (keys['ArrowRight'] && player.x + player.w < canvas.width) player.x += player.speed;
 
-    // AI 移动 (跟随球的 X 坐标，但有速度限制)
+    // AI 移动
     let aiCenter = ai.x + ai.w / 2;
-    if (aiCenter < ball.x - 10) {
-        ai.x += ai.speed;
-    } else if (aiCenter > ball.x + 10) {
-        ai.x -= ai.speed;
-    }
+    if (aiCenter < ball.x - 5) ai.x += ai.speed;
+    else if (aiCenter > ball.x + 5) ai.x -= ai.speed;
     
-    // 限制 AI 不出界
     if (ai.x < 0) ai.x = 0;
     if (ai.x + ai.w > canvas.width) ai.x = canvas.width - ai.w;
 
@@ -68,17 +94,13 @@ function update() {
         ball.dx *= -1;
     }
 
-    // --- 核心逻辑：基于击球位置的反弹角度 ---
-    
     // 碰撞检测：玩家木板
     if (ball.y + ball.r > player.y && ball.x > player.x && ball.x < player.x + player.w && ball.dy > 0) {
-        // 计算击中点距离木板中心的偏差值 (-1 到 1 之间)
         let hitPoint = ball.x - (player.x + player.w / 2);
         let normalizedHit = hitPoint / (player.w / 2); 
-        // 最大反弹角度为 60 度 (Math.PI / 3)
         let angle = normalizedHit * (Math.PI / 3); 
 
-        ball.speed += 0.2; // 每次击球稍微加速，增加刺激感
+        ball.speed += 0.5; // 每撞一次速度明显增加
         ball.dx = ball.speed * Math.sin(angle);
         ball.dy = -ball.speed * Math.cos(angle);
     }
@@ -89,7 +111,7 @@ function update() {
         let normalizedHit = hitPoint / (ai.w / 2);
         let angle = normalizedHit * (Math.PI / 3);
 
-        ball.speed += 0.2;
+        ball.speed += 0.5; // 每撞一次速度增加
         ball.dx = ball.speed * Math.sin(angle);
         ball.dy = ball.speed * Math.cos(angle);
     }
@@ -98,18 +120,20 @@ function update() {
     if (ball.y < 0) {
         player.score++;
         document.getElementById('playerScore').innerText = player.score;
-        resetBall('player');
+        if (player.score >= winScore) endGame('player');
+        else resetBall('player');
     } else if (ball.y > canvas.height) {
         ai.score++;
         document.getElementById('aiScore').innerText = ai.score;
-        resetBall('ai');
+        if (ai.score >= winScore) endGame('ai');
+        else resetBall('ai');
     }
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 画中间的虚线网
+    // 中间虚线
     ctx.setLineDash([10, 10]);
     ctx.beginPath();
     ctx.moveTo(0, canvas.height / 2);
@@ -118,19 +142,19 @@ function draw() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 画玩家木板 (圆角)
+    // 玩家木板
     ctx.fillStyle = player.color;
     ctx.beginPath();
     ctx.roundRect(player.x, player.y, player.w, player.h, 5);
     ctx.fill();
 
-    // 画 AI 木板 (圆角)
+    // AI 木板
     ctx.fillStyle = ai.color;
     ctx.beginPath();
     ctx.roundRect(ai.x, ai.y, ai.w, ai.h, 5);
     ctx.fill();
 
-    // 画球
+    // 球
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
     ctx.fillStyle = ball.color;
@@ -151,4 +175,4 @@ gameLoop();
 components.html(pong_html, height=550)
 
 st.write("---")
-st.caption("🎮 **操作说明**：键盘 **左右方向键** 移动下方的粉色木板。**击球位置越靠近木板边缘，反弹角度越大！** 让它在屏幕里飞舞起来吧！")
+st.info("💡 **致学霸女友**：\n\n我知道医学院的考试压力很大，再加上生理期身体不舒服，真的辛苦了。这个“无敌大木板”只属于你，希望你能把所有的不愉快和痛痛都反弹掉！赢了三局之后，记得来找我拿【揉肚肚+按摩券】哦！")
