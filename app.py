@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="末日求生：僵尸围城", page_icon="🧟", layout="centered")
 
 st.title("🧟 僵尸围城：极限求生")
-st.write("开局一把刀，装备全靠捡！一旦被抓咬即刻死亡，利用走位和不同武器消灭所有感染者！")
+st.write("开局一把刀，装备全靠捡！一旦被抓咬即刻死亡，利用走位消灭所有感染者！")
 
 zombie_html = """
 <div style="display: flex; justify-content: center; flex-direction: column; align-items: center;">
@@ -37,33 +37,30 @@ let gameState = 'countdown';
 let countdownNum = 3;
 let totalZombies = 30;
 let zombiesKilled = 0;
-let bloodSplats = []; // 死亡血迹记录
-let crates = [ // 地图障碍物(木箱)
+let bloodSplats = []; 
+let crates = [ 
     {x: 100, y: 100, w: 60, h: 60}, {x: 440, y: 100, w: 60, h: 60},
     {x: 270, y: 220, w: 60, h: 60}, 
     {x: 100, y: 340, w: 60, h: 60}, {x: 440, y: 340, w: 60, h: 60}
 ];
 
-// 武器字典
 const WEAPONS = {
     knife: { name: '🔪 战术匕首', type: 'melee', ammo: Infinity, cooldown: 25, range: 45, spread: 0 },
     shotgun: { name: '💥 霰弹枪', type: 'ranged', ammo: 12, cooldown: 40, speed: 10, life: 15, count: 3, spread: 0.3 },
     smg: { name: '🔫 冲锋枪', type: 'ranged', ammo: 50, cooldown: 6, speed: 12, life: 30, count: 1, spread: 0.05 }
 };
 
-// 玩家对象
 let player = {
     x: 300, y: 250, radius: 14, speed: 4,
-    dir: 'U', // U, D, L, R
+    dir: 'U', 
     weapon: 'knife', ammo: Infinity, attackTimer: 0,
-    slashEffect: 0 // 近战挥砍特效计时
+    slashEffect: 0 
 };
 
 let bullets = [];
 let zombies = [];
 let items = [];
 
-// 按键监听
 let keys = {};
 window.addEventListener('keydown', e => {
     keys[e.code] = true;
@@ -71,10 +68,8 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
-// 辅助：生成僵尸
 function spawnZombie() {
-    if (zombies.length + zombiesKilled < totalZombies && zombies.length < 8) { // 同屏最多8只
-        // 随机在边缘生成
+    if (zombies.length + zombiesKilled < totalZombies && zombies.length < 8) { 
         let edge = Math.floor(Math.random() * 4);
         let zx, zy;
         if(edge === 0) { zx = Math.random()*600; zy = -20; }
@@ -84,13 +79,12 @@ function spawnZombie() {
         
         zombies.push({
             x: zx, y: zy, radius: 14, speed: 1.5 + Math.random()*1.0, 
-            hp: 2, // 需要两发冲锋枪或一发霰弹/近战
-            wobble: Math.random() * Math.PI * 2 // 走路摇晃感
+            hp: 2, 
+            wobble: Math.random() * Math.PI * 2 
         });
     }
 }
 
-// 辅助：矩形与圆形碰撞检测 (用于障碍物)
 function circleRectCollide(cx, cy, cr, rx, ry, rw, rh) {
     let testX = cx; let testY = cy;
     if (cx < rx) testX = rx; else if (cx > rx + rw) testX = rx + rw;
@@ -99,7 +93,6 @@ function circleRectCollide(cx, cy, cr, rx, ry, rw, rh) {
     return dist <= cr;
 }
 
-// 攻击逻辑
 function attack() {
     let wp = WEAPONS[player.weapon];
     if (player.attackTimer > 0) return;
@@ -107,8 +100,7 @@ function attack() {
     player.attackTimer = wp.cooldown;
 
     if (wp.type === 'melee') {
-        player.slashEffect = 10; // 触发挥砍动画
-        // 近战判定矩形
+        player.slashEffect = 10; 
         let hitBox = {x: player.x, y: player.y, w: wp.range, h: wp.range};
         if(player.dir === 'U') { hitBox.x -= 20; hitBox.y -= wp.range; hitBox.w = 40; }
         if(player.dir === 'D') { hitBox.x -= 20; hitBox.w = 40; }
@@ -117,7 +109,6 @@ function attack() {
 
         for (let i = zombies.length - 1; i >= 0; i--) {
             let z = zombies[i];
-            // 简单的矩形-圆碰撞判定近战
             if (circleRectCollide(z.x, z.y, z.radius, hitBox.x, hitBox.y, hitBox.w, hitBox.h)) {
                 killZombie(i);
             }
@@ -127,7 +118,7 @@ function attack() {
         if (player.ammo <= 0) return;
         player.ammo--;
         if (player.ammo <= 0) {
-            player.weapon = 'knife'; // 没子弹自动切刀
+            player.weapon = 'knife'; 
             player.ammo = Infinity;
         }
         
@@ -139,7 +130,7 @@ function attack() {
 
         for (let i = 0; i < wp.count; i++) {
             let angle = baseAngle + (Math.random() - 0.5) * wp.spread;
-            if(wp.count === 3) angle = baseAngle + (i - 1) * wp.spread; // 霰弹固定散射
+            if(wp.count === 3) angle = baseAngle + (i - 1) * wp.spread; 
             
             bullets.push({
                 x: player.x, y: player.y,
@@ -150,14 +141,12 @@ function attack() {
         }
     }
     
-    // 更新 UI
     let ammoStr = player.ammo === Infinity ? '∞' : player.ammo;
     weaponStatusSpan.innerText = `武器: ${WEAPONS[player.weapon].name} (${ammoStr})`;
 }
 
 function killZombie(index) {
     let z = zombies[index];
-    // 血液飞溅
     for(let k=0; k<5; k++) {
         bloodSplats.push({
             x: z.x + (Math.random()-0.5)*20, 
@@ -169,7 +158,6 @@ function killZombie(index) {
     zombiesKilled++;
     zombieCountSpan.innerText = totalZombies - zombiesKilled;
     
-    // 随机掉落武器箱 (15% 概率)
     if (Math.random() < 0.15) {
         items.push({
             x: z.x, y: z.y, 
@@ -182,9 +170,12 @@ function killZombie(index) {
 }
 
 function update() {
-    if (gameState !== 'playing') return;
+    if (gameState === 'gameover') return;
 
-    // --- 玩家逻辑 ---
+    // ==========================================
+    // 修复点：将玩家的移动逻辑提前到状态判定之前
+    // 这样在 countdown (倒计时) 期间也可以移动！
+    // ==========================================
     if (player.attackTimer > 0) player.attackTimer--;
     if (player.slashEffect > 0) player.slashEffect--;
 
@@ -198,18 +189,24 @@ function update() {
     player.x += dx;
     if (player.x < player.radius || player.x > canvas.width - player.radius || 
         crates.some(c => circleRectCollide(player.x, player.y, player.radius, c.x, c.y, c.w, c.h))) {
-        player.x -= dx; // 还原
+        player.x -= dx; 
     }
     // 尝试移动Y
     player.y += dy;
     if (player.y < player.radius || player.y > canvas.height - player.radius || 
         crates.some(c => circleRectCollide(player.x, player.y, player.radius, c.x, c.y, c.w, c.h))) {
-        player.y -= dy; // 还原
+        player.y -= dy; 
     }
 
+    // 在倒计时期间，允许在屏幕边缘刷新僵尸（增加压迫感），但它们不会动
+    spawnZombie();
+
+    // 如果游戏还没正式开始（比如还在倒计时），就退出，不执行射击和僵尸移动逻辑
+    if (gameState !== 'playing') return;
+
+    // --- 射击、拾取、子弹与僵尸逻辑 (仅在 playing 状态执行) ---
     if (keys['Space']) attack();
 
-    // 拾取道具
     for (let i = items.length - 1; i >= 0; i--) {
         items[i].timer--;
         if (items[i].timer <= 0) { items.splice(i, 1); continue; }
@@ -221,7 +218,6 @@ function update() {
         }
     }
 
-    // --- 子弹逻辑 ---
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += b.vx; b.y += b.vy; b.life--;
@@ -232,7 +228,6 @@ function update() {
             continue;
         }
 
-        // 击中僵尸
         let hit = false;
         for (let j = zombies.length - 1; j >= 0; j--) {
             if (Math.hypot(b.x - zombies[j].x, b.y - zombies[j].y) < zombies[j].radius + 3) {
@@ -244,17 +239,14 @@ function update() {
         if (hit) bullets.splice(i, 1);
     }
 
-    // --- 僵尸逻辑 ---
     for (let i = zombies.length - 1; i >= 0; i--) {
         let z = zombies[i];
         z.wobble += 0.1;
         
-        // 追踪玩家
         let angle = Math.atan2(player.y - z.y, player.x - z.x);
         let zx = z.x + Math.cos(angle) * z.speed + Math.sin(z.wobble)*0.5;
         let zy = z.y + Math.sin(angle) * z.speed + Math.cos(z.wobble)*0.5;
 
-        // 僵尸防堆叠 (蜂群逻辑)
         for (let j = 0; j < zombies.length; j++) {
             if (i === j) continue;
             let other = zombies[j];
@@ -265,25 +257,19 @@ function update() {
             }
         }
 
-        // 碰撞木箱
         if (!crates.some(c => circleRectCollide(zx, zy, z.radius, c.x, c.y, c.w, c.h))) {
             z.x = zx; z.y = zy;
         } else {
-            // 被箱子挡住时尝试绕路 (简单滑动)
             if(!crates.some(c => circleRectCollide(zx, z.y, z.radius, c.x, c.y, c.w, c.h))) z.x = zx;
             else if(!crates.some(c => circleRectCollide(z.x, zy, z.radius, c.x, c.y, c.w, c.h))) z.y = zy;
         }
 
-        // 咬到玩家 = 死
         if (Math.hypot(player.x - z.x, player.y - z.y) < player.radius + z.radius - 4) {
             endGame(false);
         }
     }
-
-    spawnZombie();
 }
 
-// 绘图辅助：画顶视图的人/僵尸
 function drawCharacter(x, y, radius, dir, isZombie, wobble) {
     ctx.save();
     ctx.translate(x, y);
@@ -291,45 +277,36 @@ function drawCharacter(x, y, radius, dir, isZombie, wobble) {
         if(dir === 'U') ctx.rotate(-Math.PI/2);
         if(dir === 'D') ctx.rotate(Math.PI/2);
         if(dir === 'L') ctx.rotate(Math.PI);
-        // R is default 0
     } else if (isZombie) {
-        // 僵尸朝向玩家
         ctx.rotate(Math.atan2(player.y - y, player.x - x));
     }
 
-    // 肩膀/身体
     ctx.fillStyle = isZombie ? "#2a9d8f" : "#457b9d";
     ctx.beginPath();
     ctx.ellipse(0, 0, radius, radius*1.5, 0, 0, Math.PI*2);
     ctx.fill();
 
-    // 伸出的手
     ctx.fillStyle = isZombie ? "#4c956c" : "#ffb5a7";
     if (isZombie) {
         let armExt = 10 + Math.sin(wobble)*3;
         ctx.beginPath(); ctx.arc(radius, -8, 4, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(radius, 8, 4, 0, Math.PI*2); ctx.fill();
-        // 衣服破损
         ctx.fillStyle = "#1a1a1a";
         ctx.fillRect(-5, -5, 4, 4);
     } else {
-        // 玩家拿武器的手
         ctx.beginPath(); ctx.arc(radius, 8, 5, 0, Math.PI*2); ctx.fill();
-        
-        // 绘制持握的武器
         if(player.weapon === 'knife') {
-            ctx.fillStyle = "#ced4da"; // 刀刃
+            ctx.fillStyle = "#ced4da"; 
             ctx.fillRect(radius, 6, 12, 3);
         } else if(player.weapon === 'shotgun') {
             ctx.fillStyle = "#343a40"; 
-            ctx.fillRect(radius-5, 5, 20, 6); // 枪管粗
+            ctx.fillRect(radius-5, 5, 20, 6); 
         } else {
             ctx.fillStyle = "#212529"; 
-            ctx.fillRect(radius-2, 6, 16, 4); // 枪管细
+            ctx.fillRect(radius-2, 6, 16, 4); 
         }
     }
 
-    // 头
     ctx.fillStyle = isZombie ? "#606c38" : "#ffcdb2";
     ctx.beginPath();
     ctx.arc(0, 0, radius*0.8, 0, Math.PI*2);
@@ -342,19 +319,16 @@ function drawCharacter(x, y, radius, dir, isZombie, wobble) {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 地板网格线 (增加末日基地感)
     ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
     ctx.lineWidth = 2;
     for(let i=0; i<600; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,500); ctx.stroke(); }
     for(let i=0; i<500; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(600,i); ctx.stroke(); }
 
-    // 绘制血迹 (底层)
     ctx.fillStyle = "rgba(138, 3, 3, 0.6)";
     bloodSplats.forEach(s => {
         ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
     });
 
-    // 绘制木箱障碍物
     crates.forEach(c => {
         ctx.fillStyle = "#6f4e37";
         ctx.fillRect(c.x, c.y, c.w, c.h);
@@ -364,26 +338,22 @@ function draw() {
         ctx.beginPath(); ctx.moveTo(c.x+c.w, c.y); ctx.lineTo(c.x, c.y+c.h); ctx.stroke();
     });
 
-    // 绘制道具
     items.forEach(it => {
         ctx.fillStyle = it.type === 'shotgun' ? "#fca311" : "#8ecae6";
         ctx.beginPath(); ctx.fillRect(it.x-8, it.y-8, 16, 16);
         ctx.fillStyle = "white"; ctx.font = "10px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.fillText(it.type === 'shotgun' ? "S" : "M", it.x, it.y);
-        // 闪烁光环
         if(it.timer % 20 < 10) {
             ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth=2;
             ctx.beginPath(); ctx.arc(it.x, it.y, 14, 0, Math.PI*2); ctx.stroke();
         }
     });
 
-    // 绘制子弹
     ctx.fillStyle = "#ffb703";
     bullets.forEach(b => {
         ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI*2); ctx.fill();
     });
 
-    // 绘制近战刀光特效
     if (player.weapon === 'knife' && player.slashEffect > 0) {
         ctx.strokeStyle = `rgba(255, 255, 255, ${player.slashEffect/10})`;
         ctx.lineWidth = 4;
@@ -396,13 +366,9 @@ function draw() {
         ctx.stroke();
     }
 
-    // 绘制僵尸
     zombies.forEach(z => drawCharacter(z.x, z.y, z.radius, null, true, z.wobble));
-
-    // 绘制玩家
     drawCharacter(player.x, player.y, player.radius, player.dir, false, 0);
 
-    // 开局倒计时
     if (gameState === 'countdown') {
         ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
         ctx.fillRect(0,0,canvas.width, canvas.height);
@@ -443,21 +409,12 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// 提前生成几只僵尸在边缘，增加开局压迫感
+for(let i=0; i<4; i++) spawnZombie();
+
 startCountdown();
 gameLoop();
 </script>
 """
 
 components.html(zombie_html, height=600)
-
-st.write("---")
-st.info("""
-### 🪓 生存指南：
-* **移动与攻击**：**方向键**控制移动和面向，**空格键 (Space)** 攻击。
-* **致命规则**：你只有一条命。**绝对不要让僵尸碰到你！**
-* **风筝战术 (Kiting)**：利用地图上的 5 个木箱卡僵尸的走位，边退边打。
-* **武器补给**：击杀僵尸有概率掉落武器箱，碰到即可拾取。
-  * `[S] 箱` = **霰弹枪** (近距离范围秒杀，12 发弹药)
-  * `[M] 箱` = **冲锋枪** (高射速拉扯，50 发弹药)
-  * 弹药耗尽后会自动切换回**战术匕首**。
-""")
