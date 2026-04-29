@@ -2,17 +2,17 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # 设置页面
-st.set_page_config(page_title="大姨妈大作战 - 硬核版", page_icon="🔥", layout="centered")
+st.set_page_config(page_title="硬核反击战", page_icon="🔥", layout="centered")
 
-st.title("🔥 击退大姨妈：硬核保卫战")
-st.write("现在的“大姨妈”实力与你旗鼓相当！挥舞你的木板，用愤怒的火球把她打飞吧！先赢三局者胜。")
+st.title("🔥 硬核反击战：打飞大姨妈")
+st.write("现在的“大姨妈”实力与你旗鼓相当。用火球把她狠狠打飞，先赢三局者胜！")
 
 # 乒乓游戏 HTML/JS 逻辑
 pong_html = """
 <div style="display: flex; justify-content: center; flex-direction: column; align-items: center;">
     <div id="game-ui" style="display: flex; justify-content: space-between; width: 400px; margin-bottom: 10px; font-family: 'Microsoft YaHei', sans-serif; font-size: 1.2em; font-weight: bold;">
         <span style="color: #4361ee;">大姨妈: <span id="aiScore">0</span></span>
-        <span style="color: #ff4d6d;">仙女学霸: <span id="playerScore">0</span></span>
+        <span style="color: #ff4d6d;">你: <span id="playerScore">0</span></span>
     </div>
     <div id="game-container" style="position: relative;">
         <canvas id="pongCanvas" width="400" height="500" style="border: 4px solid #ffafcc; border-radius: 10px; background: #2b2d42; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"></canvas>
@@ -33,17 +33,18 @@ const resultMsg = document.getElementById('result-msg');
 
 // 游戏配置
 const winScore = 3;
-let isGameOver = false;
+let gameState = 'countdown'; // 状态：countdown, playing, gameover
+let countdownNum = 3;
+let countInterval;
+let lastScorer = 'ai'; // 记录上次得分者，决定发球方向
 
-// 【修改1 & 3】：木板长度一样（都是80），移动速度一样（都是6）
+// 木板属性
 const player = { x: 160, y: 470, w: 80, h: 12, color: '#ff4d6d', score: 0, speed: 6 };
 const ai = { x: 160, y: 18, w: 80, h: 12, color: '#4361ee', score: 0, speed: 6 };
 
 // 球的初始属性
 let initialBallSpeed = 5;
-const ball = { x: 200, y: 250, r: 8, speed: initialBallSpeed, dx: 3, dy: 3 };
-
-// 【修改2】：用于存储火球尾迹的数组
+const ball = { x: 200, y: 250, r: 8, speed: initialBallSpeed, dx: 0, dy: 0 };
 let trail = [];
 
 let keys = {};
@@ -53,41 +54,54 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
+// 发球与倒计时逻辑
 function resetBall(scorer) {
+    if (scorer) lastScorer = scorer;
+    
+    // 把球放回中心
     ball.x = canvas.width / 2;
     ball.y = canvas.height / 2;
-    ball.speed = initialBallSpeed; 
-    ball.dy = scorer === 'player' ? -initialBallSpeed : initialBallSpeed;
-    ball.dx = (Math.random() > 0.5 ? 1 : -1) * initialBallSpeed;
-    trail = []; // 重置球时清空尾迹
+    ball.dx = 0;
+    ball.dy = 0;
+    trail = []; // 清空尾迹
+    
+    gameState = 'countdown';
+    countdownNum = 3;
+
+    if (countInterval) clearInterval(countInterval);
+    
+    countInterval = setInterval(() => {
+        countdownNum--;
+        if (countdownNum < 0) {
+            clearInterval(countInterval);
+            gameState = 'playing';
+            ball.speed = initialBallSpeed; 
+            // 谁得分，球就发给对方（向对方移动）
+            ball.dy = lastScorer === 'player' ? -initialBallSpeed : initialBallSpeed;
+            ball.dx = (Math.random() > 0.5 ? 1 : -1) * initialBallSpeed;
+        }
+    }, 800); // 800ms 一跳，节奏更紧凑
 }
 
 function endGame(winner) {
-    isGameOver = true;
+    gameState = 'gameover';
     overlay.style.display = 'flex';
     if (winner === 'player') {
-        resultTitle.innerText = "🏆 浴火重生，大获全胜！";
-        resultMsg.innerHTML = "你用熊熊燃烧的火球彻底击退了“大姨妈”！<br><br>战斗结束，快把手机扔给男朋友，去兑换你的专属按摩服务吧 ❤️";
+        resultTitle.innerText = "🏆 完胜！";
+        resultMsg.innerHTML = "成功击退大姨妈！<br><br>放下手机，你的专属跑腿已就位，想吃什么直接点单。";
     } else {
-        resultTitle.innerText = "💥 哎呀，大意了！";
-        resultMsg.innerText = "这次“大姨妈”有点猛，深呼吸，喝口热水，呼叫男朋友来助阵！";
+        resultTitle.innerText = "💥 惜败！";
+        resultMsg.innerText = "这局大姨妈有点猛。喝口热水休息一下，我来替你报仇！";
     }
 }
 
 function update() {
-    if (isGameOver) return;
+    if (gameState === 'gameover') return;
 
-    // 记录球的位置用于生成火球尾迹
-    trail.push({x: ball.x, y: ball.y});
-    if (trail.length > 12) {
-        trail.shift(); // 保持尾迹长度
-    }
-
-    // 玩家移动
+    // 无论是否在倒计时，玩家和AI都可以移动木板找位置
     if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
     if (keys['ArrowRight'] && player.x + player.w < canvas.width) player.x += player.speed;
 
-    // AI 移动 (难度增加：速度和玩家一样快)
     let aiCenter = ai.x + ai.w / 2;
     if (aiCenter < ball.x - 5) ai.x += ai.speed;
     else if (aiCenter > ball.x + 5) ai.x -= ai.speed;
@@ -95,56 +109,61 @@ function update() {
     if (ai.x < 0) ai.x = 0;
     if (ai.x + ai.w > canvas.width) ai.x = canvas.width - ai.w;
 
-    // 球的移动
-    ball.x += ball.dx;
-    ball.y += ball.dy;
+    // 只有在 playing 状态下，球才移动和判定
+    if (gameState === 'playing') {
+        trail.push({x: ball.x, y: ball.y});
+        if (trail.length > 12) trail.shift();
 
-    // 左右墙壁反弹
-    if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
-        ball.dx *= -1;
-        ball.x = ball.x - ball.r < 0 ? ball.r : canvas.width - ball.r; // 防止卡墙
-    }
+        ball.x += ball.dx;
+        ball.y += ball.dy;
 
-    // 碰撞检测：玩家木板
-    if (ball.y + ball.r > player.y && ball.x > player.x && ball.x < player.x + player.w && ball.dy > 0) {
-        let hitPoint = ball.x - (player.x + player.w / 2);
-        let normalizedHit = hitPoint / (player.w / 2); 
-        let angle = normalizedHit * (Math.PI / 3); 
+        // 左右墙壁反弹
+        if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
+            ball.dx *= -1;
+            ball.x = ball.x - ball.r < 0 ? ball.r : canvas.width - ball.r; 
+        }
 
-        ball.speed += 0.6; // 火球越打越快
-        ball.dx = ball.speed * Math.sin(angle);
-        ball.dy = -ball.speed * Math.cos(angle);
-    }
+        // 碰撞检测：玩家
+        if (ball.y + ball.r > player.y && ball.x > player.x && ball.x < player.x + player.w && ball.dy > 0) {
+            let hitPoint = ball.x - (player.x + player.w / 2);
+            let normalizedHit = hitPoint / (player.w / 2); 
+            let angle = normalizedHit * (Math.PI / 3); 
 
-    // 碰撞检测：AI 木板
-    if (ball.y - ball.r < ai.y + ai.h && ball.x > ai.x && ball.x < ai.x + ai.w && ball.dy < 0) {
-        let hitPoint = ball.x - (ai.x + ai.w / 2);
-        let normalizedHit = hitPoint / (ai.w / 2);
-        let angle = normalizedHit * (Math.PI / 3);
+            ball.speed += 0.6; // 加速
+            ball.dx = ball.speed * Math.sin(angle);
+            ball.dy = -ball.speed * Math.cos(angle);
+        }
 
-        ball.speed += 0.6; 
-        ball.dx = ball.speed * Math.sin(angle);
-        ball.dy = ball.speed * Math.cos(angle);
-    }
+        // 碰撞检测：AI
+        if (ball.y - ball.r < ai.y + ai.h && ball.x > ai.x && ball.x < ai.x + ai.w && ball.dy < 0) {
+            let hitPoint = ball.x - (ai.x + ai.w / 2);
+            let normalizedHit = hitPoint / (ai.w / 2);
+            let angle = normalizedHit * (Math.PI / 3);
 
-    // 计分系统
-    if (ball.y < 0) {
-        player.score++;
-        document.getElementById('playerScore').innerText = player.score;
-        if (player.score >= winScore) endGame('player');
-        else resetBall('player');
-    } else if (ball.y > canvas.height) {
-        ai.score++;
-        document.getElementById('aiScore').innerText = ai.score;
-        if (ai.score >= winScore) endGame('ai');
-        else resetBall('ai');
+            ball.speed += 0.6; 
+            ball.dx = ball.speed * Math.sin(angle);
+            ball.dy = ball.speed * Math.cos(angle);
+        }
+
+        // 计分
+        if (ball.y < 0) {
+            player.score++;
+            document.getElementById('playerScore').innerText = player.score;
+            if (player.score >= winScore) endGame('player');
+            else resetBall('player');
+        } else if (ball.y > canvas.height) {
+            ai.score++;
+            document.getElementById('aiScore').innerText = ai.score;
+            if (ai.score >= winScore) endGame('ai');
+            else resetBall('ai');
+        }
     }
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 中间虚线 (为了配合火球，把网线改暗一点)
+    // 中间网格线
     ctx.setLineDash([10, 10]);
     ctx.beginPath();
     ctx.moveTo(0, canvas.height / 2);
@@ -165,29 +184,43 @@ function draw() {
     ctx.roundRect(ai.x, ai.y, ai.w, ai.h, 5);
     ctx.fill();
 
-    // 【修改2】：绘制火球尾迹
+    // 绘制火球尾迹
     for (let i = 0; i < trail.length; i++) {
-        let alpha = i / trail.length; // 越老的尾迹越透明
-        let radius = ball.r * alpha;  // 越老的尾迹越小
+        let alpha = i / trail.length; 
+        let radius = ball.r * alpha;  
         ctx.beginPath();
         ctx.arc(trail[i].x, trail[i].y, radius, 0, Math.PI * 2);
-        // 尾迹颜色：红色到橙色的过渡
         ctx.fillStyle = `rgba(255, ${100 + alpha * 50}, 0, ${alpha * 0.6})`;
         ctx.fill();
     }
 
-    // 【修改2】：绘制火球本体 (径向渐变，中心黄，边缘红)
+    // 绘制火球本体
     let gradient = ctx.createRadialGradient(ball.x, ball.y, 1, ball.x, ball.y, ball.r);
-    gradient.addColorStop(0, "#fffbd5"); // 核心白黄
-    gradient.addColorStop(0.3, "#ffb703"); // 内圈金黄
-    gradient.addColorStop(0.7, "#fb8500"); // 中圈橙色
-    gradient.addColorStop(1, "#d00000");   // 外圈深红
+    gradient.addColorStop(0, "#fffbd5"); 
+    gradient.addColorStop(0.3, "#ffb703"); 
+    gradient.addColorStop(0.7, "#fb8500"); 
+    gradient.addColorStop(1, "#d00000");   
     
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
     ctx.fillStyle = gradient;
     ctx.fill();
     ctx.closePath();
+
+    // --- 绘制倒计时 ---
+    if (gameState === 'countdown') {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.font = "bold 80px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        let text = countdownNum > 0 ? countdownNum : "GO!";
+        
+        // 发光特效
+        ctx.shadowColor = "#ff4d6d";
+        ctx.shadowBlur = 15;
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+        ctx.shadowBlur = 0; // 恢复正常状态
+    }
 }
 
 function gameLoop() {
@@ -196,6 +229,8 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// 初始化游戏：开局让AI发球（球向玩家飞）
+resetBall('ai'); 
 gameLoop();
 </script>
 """
@@ -203,4 +238,4 @@ gameLoop();
 components.html(pong_html, height=550)
 
 st.write("---")
-st.info("💡 **致学霸女友**：\n\n开启硬核模式！把你的烦恼和痛楚全都灌注到这个火球里，狠狠地砸向对面吧！打赢了重重有赏！")
+st.info("💡 操作提示：键盘左右键控制。备考辛苦啦，把复习的压力和身体的烦躁都砸进火球里打飞吧！通关后可解锁特殊奖励（比如某人包揽今晚家务）。")
