@@ -1,24 +1,24 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="硬核坦克保卫战", page_icon="🚜", layout="centered")
+st.set_page_config(page_title="末日求生：僵尸围城", page_icon="🧟", layout="centered")
 
-st.title("🚜 坦克大战：全面进化版")
-st.write("敌军全面升级，AI更狡猾，数量更庞大。收集空投道具，用重火力摧毁它们！")
+st.title("🧟 僵尸围城：极限求生")
+st.write("开局一把刀，装备全靠捡！一旦被抓咬即刻死亡，利用走位和不同武器消灭所有感染者！")
 
-tank_html = """
+zombie_html = """
 <div style="display: flex; justify-content: center; flex-direction: column; align-items: center;">
-    <div id="game-ui" style="display: flex; justify-content: space-between; width: 520px; margin-bottom: 10px; font-family: 'Microsoft YaHei', sans-serif; font-size: 1.2em; font-weight: bold; background: #f8f9fa; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-        <span style="color: #e63946;">敌军剩余: <span id="enemyCount">15</span></span>
-        <span style="color: #4361ee;" id="weaponStatus">武器: 标配</span>
-        <span style="color: #ff4d6d;">装甲生命: <span id="playerLife">3</span></span>
+    <div id="game-ui" style="display: flex; justify-content: space-between; width: 600px; margin-bottom: 10px; font-family: 'Microsoft YaHei', sans-serif; font-size: 1.2em; font-weight: bold; background: #1a1a1a; color: #fff; padding: 10px 20px; border-radius: 5px; border-bottom: 3px solid #e63946;">
+        <span style="color: #e63946;">感染者剩余: <span id="zombieCount">30</span></span>
+        <span style="color: #ffb703;" id="weaponStatus">武器: 🔪 战术匕首 (∞)</span>
+        <span style="color: #52b788;">状态: 存活</span>
     </div>
     <div id="game-container" style="position: relative;">
-        <canvas id="gameCanvas" width="520" height="520" style="border: 5px solid #6c757d; border-radius: 8px; background: #212529; box-shadow: 0 8px 16px rgba(0,0,0,0.6);"></canvas>
-        <div id="overlay" style="position: absolute; top: 0; left: 0; width: 520px; height: 520px; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; border-radius: 8px;">
-            <h1 id="result-title" style="color: #ffb703; font-size: 3em; text-shadow: 2px 2px 0px #000;"></h1>
-            <p id="result-msg" style="padding: 20px; color: #f8f9fa; font-size: 1.2em; font-weight: bold;"></p>
-            <button onclick="location.reload()" style="padding: 12px 30px; background: #e63946; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.2em; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">Reload & Retry</button>
+        <canvas id="gameCanvas" width="600" height="500" style="border: 4px solid #343a40; border-radius: 5px; background: #2b2b2b; box-shadow: 0 10px 20px rgba(0,0,0,0.8); cursor: crosshair;"></canvas>
+        <div id="overlay" style="position: absolute; top: 0; left: 0; width: 600px; height: 500px; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; border-radius: 5px;">
+            <h1 id="result-title" style="color: #e63946; font-size: 3.5em; margin-bottom: 10px; text-transform: uppercase;">YOU DIED</h1>
+            <p id="result-msg" style="color: #aaa; font-size: 1.2em; margin-bottom: 30px;"></p>
+            <button onclick="location.reload()" style="padding: 12px 30px; background: #e63946; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.2em; font-weight: bold; letter-spacing: 2px;">RESTART</button>
         </div>
     </div>
 </div>
@@ -29,361 +29,387 @@ const ctx = canvas.getContext('2d');
 const overlay = document.getElementById('overlay');
 const resultTitle = document.getElementById('result-title');
 const resultMsg = document.getElementById('result-msg');
-const enemyCountSpan = document.getElementById('enemyCount');
-const playerLifeSpan = document.getElementById('playerLife');
+const zombieCountSpan = document.getElementById('zombieCount');
 const weaponStatusSpan = document.getElementById('weaponStatus');
 
-const TILE = 40;
-const ROWS = 13;
-const COLS = 13;
-
-// 0:空地, 1:红砖(可炸), 2:钢板(只有火焰弹可熔化)
-let map = [
-    [0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,1,1,0,1,2,1,2,1,0,1,1,0],
-    [0,1,1,0,1,1,1,1,1,0,1,1,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [1,1,0,2,2,0,1,0,2,2,0,1,1],
-    [1,1,0,2,1,0,1,0,1,2,0,1,1],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [1,1,0,2,1,0,1,0,1,2,0,1,1],
-    [1,1,0,2,2,0,1,0,2,2,0,1,1],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,1,1,0,1,1,2,1,1,0,1,1,0],
-    [0,1,1,0,1,1,1,1,1,0,1,1,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0]
-];
-
-let player = { x: 240, y: 480, dir: 'U', size: 32, speed: 4, lives: 3, bullets: [], weapon: 'normal', shieldTimer: 0 };
-let enemies = [];
-let items = [];
-let totalEnemiesToSpawn = 15;
-let enemiesDestroyed = 0;
+// 游戏全局变量
 let gameState = 'countdown';
 let countdownNum = 3;
+let totalZombies = 30;
+let zombiesKilled = 0;
+let bloodSplats = []; // 死亡血迹记录
+let crates = [ // 地图障碍物(木箱)
+    {x: 100, y: 100, w: 60, h: 60}, {x: 440, y: 100, w: 60, h: 60},
+    {x: 270, y: 220, w: 60, h: 60}, 
+    {x: 100, y: 340, w: 60, h: 60}, {x: 440, y: 340, w: 60, h: 60}
+];
 
+// 武器字典
+const WEAPONS = {
+    knife: { name: '🔪 战术匕首', type: 'melee', ammo: Infinity, cooldown: 25, range: 45, spread: 0 },
+    shotgun: { name: '💥 霰弹枪', type: 'ranged', ammo: 12, cooldown: 40, speed: 10, life: 15, count: 3, spread: 0.3 },
+    smg: { name: '🔫 冲锋枪', type: 'ranged', ammo: 50, cooldown: 6, speed: 12, life: 30, count: 1, spread: 0.05 }
+};
+
+// 玩家对象
+let player = {
+    x: 300, y: 250, radius: 14, speed: 4,
+    dir: 'U', // U, D, L, R
+    weapon: 'knife', ammo: Infinity, attackTimer: 0,
+    slashEffect: 0 // 近战挥砍特效计时
+};
+
+let bullets = [];
+let zombies = [];
+let items = [];
+
+// 按键监听
 let keys = {};
 window.addEventListener('keydown', e => {
     keys[e.code] = true;
     if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
-    if(e.code === 'Space' && gameState === 'playing') fireBullet(player);
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
-// 绘制精致版坦克
-function drawTank(tank, baseColor, turretColor) {
-    ctx.save();
-    ctx.translate(tank.x + tank.size/2, tank.y + tank.size/2);
-    
-    // 旋转炮管朝向
-    if(tank.dir === 'U') ctx.rotate(0);
-    else if(tank.dir === 'R') ctx.rotate(Math.PI/2);
-    else if(tank.dir === 'D') ctx.rotate(Math.PI);
-    else if(tank.dir === 'L') ctx.rotate(-Math.PI/2);
-
-    // 1. 履带 (带纹理)
-    ctx.fillStyle = "#343a40";
-    ctx.fillRect(-16, -16, 8, 32);
-    ctx.fillRect(8, -16, 8, 32);
-    ctx.fillStyle = "#212529";
-    for(let i = -14; i <= 14; i += 6) {
-        ctx.fillRect(-16, i, 8, 2);
-        ctx.fillRect(8, i, 8, 2);
-    }
-
-    // 2. 车身底座
-    ctx.fillStyle = baseColor;
-    ctx.beginPath();
-    ctx.roundRect(-10, -14, 20, 28, 4);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.3)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // 3. 炮筒
-    ctx.fillStyle = "#adb5bd";
-    ctx.fillRect(-2, -22, 4, 16);
-    ctx.fillStyle = "#495057";
-    ctx.fillRect(-3, -24, 6, 4); // 炮口
-
-    // 4. 中央炮塔
-    ctx.fillStyle = turretColor;
-    ctx.beginPath();
-    ctx.arc(0, 0, 8, 0, Math.PI*2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.restore();
-
-    // 护盾特效
-    if(tank.shieldTimer > 0) {
-        ctx.strokeStyle = `rgba(0, 255, 255, ${0.5 + Math.abs(Math.sin(Date.now()/100))*0.5})`;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(tank.x + tank.size/2, tank.y + tank.size/2, 22, 0, Math.PI*2);
-        ctx.stroke();
-    }
-}
-
-// 武器开火逻辑
-function fireBullet(tank) {
-    let maxB = tank.weapon === 'spread' ? 6 : 3; // 玩家允许同屏多子弹
-    if (tank.bullets.length >= maxB) return;
-    
-    let bx = tank.x + tank.size/2;
-    let by = tank.y + tank.size/2;
-    let speed = tank.weapon === 'fire' ? 8 : 6;
-    let type = tank.weapon || 'normal';
-
-    if (tank.weapon === 'spread') {
-        const dirs = ['U','R','D','L'];
-        let fIdx = dirs.indexOf(tank.dir);
-        // 发射前方、左方、右方
-        tank.bullets.push({x: bx, y: by, dir: dirs[fIdx], speed: speed, type: 'normal'});
-        tank.bullets.push({x: bx, y: by, dir: dirs[(fIdx+1)%4], speed: speed, type: 'normal'});
-        tank.bullets.push({x: bx, y: by, dir: dirs[(fIdx+3)%4], speed: speed, type: 'normal'});
-    } else {
-        tank.bullets.push({x: bx, y: by, dir: tank.dir, speed: speed, type: type});
-    }
-}
-
-function spawnEnemy() {
-    if (enemies.length + enemiesDestroyed < totalEnemiesToSpawn && enemies.length < 6) { // 同屏最多6辆
-        let spawnPos = [40, 240, 440];
-        let sx = spawnPos[Math.floor(Math.random() * spawnPos.length)];
-        enemies.push({ 
-            x: sx, y: 0, dir: 'D', size: 32, speed: 2, bullets: [], moveTimer: 0 
+// 辅助：生成僵尸
+function spawnZombie() {
+    if (zombies.length + zombiesKilled < totalZombies && zombies.length < 8) { // 同屏最多8只
+        // 随机在边缘生成
+        let edge = Math.floor(Math.random() * 4);
+        let zx, zy;
+        if(edge === 0) { zx = Math.random()*600; zy = -20; }
+        else if(edge === 1) { zx = Math.random()*600; zy = 520; }
+        else if(edge === 2) { zx = -20; zy = Math.random()*500; }
+        else { zx = 620; zy = Math.random()*500; }
+        
+        zombies.push({
+            x: zx, y: zy, radius: 14, speed: 1.5 + Math.random()*1.0, 
+            hp: 2, // 需要两发冲锋枪或一发霰弹/近战
+            wobble: Math.random() * Math.PI * 2 // 走路摇晃感
         });
     }
 }
 
-function checkCollision(x, y, size) {
-    let margin = 4; // 碰撞容错
-    let l = Math.floor((x+margin)/TILE), r = Math.floor((x+size-margin)/TILE);
-    let t = Math.floor((y+margin)/TILE), b = Math.floor((y+size-margin)/TILE);
-    if(l<0 || r>=COLS || t<0 || b>=ROWS) return true; // 越界
-    for(let i=t; i<=b; i++) {
-        for(let j=l; j<=r; j++) {
-            if(map[i][j] !== 0) return true;
+// 辅助：矩形与圆形碰撞检测 (用于障碍物)
+function circleRectCollide(cx, cy, cr, rx, ry, rw, rh) {
+    let testX = cx; let testY = cy;
+    if (cx < rx) testX = rx; else if (cx > rx + rw) testX = rx + rw;
+    if (cy < ry) testY = ry; else if (cy > ry + rh) testY = ry + rh;
+    let dist = Math.hypot(cx - testX, cy - testY);
+    return dist <= cr;
+}
+
+// 攻击逻辑
+function attack() {
+    let wp = WEAPONS[player.weapon];
+    if (player.attackTimer > 0) return;
+    
+    player.attackTimer = wp.cooldown;
+
+    if (wp.type === 'melee') {
+        player.slashEffect = 10; // 触发挥砍动画
+        // 近战判定矩形
+        let hitBox = {x: player.x, y: player.y, w: wp.range, h: wp.range};
+        if(player.dir === 'U') { hitBox.x -= 20; hitBox.y -= wp.range; hitBox.w = 40; }
+        if(player.dir === 'D') { hitBox.x -= 20; hitBox.w = 40; }
+        if(player.dir === 'L') { hitBox.x -= wp.range; hitBox.y -= 20; hitBox.h = 40; }
+        if(player.dir === 'R') { hitBox.y -= 20; hitBox.h = 40; }
+
+        for (let i = zombies.length - 1; i >= 0; i--) {
+            let z = zombies[i];
+            // 简单的矩形-圆碰撞判定近战
+            if (circleRectCollide(z.x, z.y, z.radius, hitBox.x, hitBox.y, hitBox.w, hitBox.h)) {
+                killZombie(i);
+            }
+        }
+    } 
+    else if (wp.type === 'ranged') {
+        if (player.ammo <= 0) return;
+        player.ammo--;
+        if (player.ammo <= 0) {
+            player.weapon = 'knife'; // 没子弹自动切刀
+            player.ammo = Infinity;
+        }
+        
+        let baseAngle = 0;
+        if(player.dir === 'U') baseAngle = -Math.PI/2;
+        if(player.dir === 'D') baseAngle = Math.PI/2;
+        if(player.dir === 'L') baseAngle = Math.PI;
+        if(player.dir === 'R') baseAngle = 0;
+
+        for (let i = 0; i < wp.count; i++) {
+            let angle = baseAngle + (Math.random() - 0.5) * wp.spread;
+            if(wp.count === 3) angle = baseAngle + (i - 1) * wp.spread; // 霰弹固定散射
+            
+            bullets.push({
+                x: player.x, y: player.y,
+                vx: Math.cos(angle) * wp.speed,
+                vy: Math.sin(angle) * wp.speed,
+                life: wp.life
+            });
         }
     }
-    return false;
+    
+    // 更新 UI
+    let ammoStr = player.ammo === Infinity ? '∞' : player.ammo;
+    weaponStatusSpan.innerText = `武器: ${WEAPONS[player.weapon].name} (${ammoStr})`;
+}
+
+function killZombie(index) {
+    let z = zombies[index];
+    // 血液飞溅
+    for(let k=0; k<5; k++) {
+        bloodSplats.push({
+            x: z.x + (Math.random()-0.5)*20, 
+            y: z.y + (Math.random()-0.5)*20, 
+            r: 2 + Math.random()*4 
+        });
+    }
+    zombies.splice(index, 1);
+    zombiesKilled++;
+    zombieCountSpan.innerText = totalZombies - zombiesKilled;
+    
+    // 随机掉落武器箱 (15% 概率)
+    if (Math.random() < 0.15) {
+        items.push({
+            x: z.x, y: z.y, 
+            type: Math.random() > 0.5 ? 'shotgun' : 'smg',
+            timer: 500
+        });
+    }
+
+    if (zombiesKilled >= totalZombies) endGame(true);
 }
 
 function update() {
     if (gameState !== 'playing') return;
 
-    // --- 道具系统：随机生成 ---
-    if(Math.random() < 0.005 && items.length < 2) {
-        let r = Math.floor(Math.random()*ROWS), c = Math.floor(Math.random()*COLS);
-        if(map[r][c] === 0) {
-           let types = ['fire', 'spread', 'shield'];
-           items.push({r: r, c: c, type: types[Math.floor(Math.random()*3)], timer: 600});
-        }
-    }
-
     // --- 玩家逻辑 ---
-    if (player.shieldTimer > 0) player.shieldTimer--;
-    
-    let oldX = player.x, oldY = player.y;
-    if (keys['ArrowUp']) { player.y -= player.speed; player.dir = 'U'; }
-    else if (keys['ArrowDown']) { player.y += player.speed; player.dir = 'D'; }
-    else if (keys['ArrowLeft']) { player.x -= player.speed; player.dir = 'L'; }
-    else if (keys['ArrowRight']) { player.x += player.speed; player.dir = 'R'; }
-    
-    if (checkCollision(player.x, player.y, player.size)) {
-        player.x = oldX; player.y = oldY;
+    if (player.attackTimer > 0) player.attackTimer--;
+    if (player.slashEffect > 0) player.slashEffect--;
+
+    let dx = 0, dy = 0;
+    if (keys['ArrowUp']) { dy -= player.speed; player.dir = 'U'; }
+    if (keys['ArrowDown']) { dy += player.speed; player.dir = 'D'; }
+    if (keys['ArrowLeft']) { dx -= player.speed; player.dir = 'L'; }
+    if (keys['ArrowRight']) { dx += player.speed; player.dir = 'R'; }
+
+    // 尝试移动X
+    player.x += dx;
+    if (player.x < player.radius || player.x > canvas.width - player.radius || 
+        crates.some(c => circleRectCollide(player.x, player.y, player.radius, c.x, c.y, c.w, c.h))) {
+        player.x -= dx; // 还原
+    }
+    // 尝试移动Y
+    player.y += dy;
+    if (player.y < player.radius || player.y > canvas.height - player.radius || 
+        crates.some(c => circleRectCollide(player.x, player.y, player.radius, c.x, c.y, c.w, c.h))) {
+        player.y -= dy; // 还原
     }
 
-    // 道具拾取
-    for(let i = items.length-1; i>=0; i--) {
+    if (keys['Space']) attack();
+
+    // 拾取道具
+    for (let i = items.length - 1; i >= 0; i--) {
         items[i].timer--;
-        if(items[i].timer <= 0) { items.splice(i,1); continue; }
-        
-        let cx = items[i].c * TILE + TILE/2, cy = items[i].r * TILE + TILE/2;
-        if (Math.abs((player.x+16) - cx) < 24 && Math.abs((player.y+16) - cy) < 24) {
-            let t = items[i].type;
-            if(t === 'shield') player.shieldTimer = 400; // 约6秒无敌
-            else {
-                player.weapon = t;
-                weaponStatusSpan.innerText = t === 'fire' ? "武器: 🔥 火焰弹" : "武器: 🌟 散射弹";
-            }
-            items.splice(i,1);
+        if (items[i].timer <= 0) { items.splice(i, 1); continue; }
+        if (Math.hypot(player.x - items[i].x, player.y - items[i].y) < player.radius + 15) {
+            player.weapon = items[i].type;
+            player.ammo = WEAPONS[items[i].type].ammo;
+            weaponStatusSpan.innerText = `武器: ${WEAPONS[player.weapon].name} (${player.ammo})`;
+            items.splice(i, 1);
         }
     }
 
-    // --- 智能 AI 逻辑 ---
-    enemies.forEach(en => {
-        let dx = player.x - en.x;
-        let dy = player.y - en.y;
-
-        // 视线与射击判定：如果与玩家处在同一直线，开火并调整方向
-        let aligned = false;
-        if (Math.abs(dx) < 20) {
-            en.dir = dy > 0 ? 'D' : 'U';
-            aligned = true;
-        } else if (Math.abs(dy) < 20) {
-            en.dir = dx > 0 ? 'R' : 'L';
-            aligned = true;
-        }
+    // --- 子弹逻辑 ---
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        b.x += b.vx; b.y += b.vy; b.life--;
         
-        if (aligned && Math.random() < 0.05) fireBullet(en);
-        else if (Math.random() < 0.01) fireBullet(en);
-
-        en.moveTimer--;
-        // 遇到障碍或定时器到，重新寻路
-        if (en.moveTimer <= 0 || checkCollision(en.x, en.y, en.size)) {
-            let possibleDirs = [];
-            // 优先向玩家方向移动
-            if(Math.abs(dx) > Math.abs(dy)) {
-                possibleDirs.push(dx > 0 ? 'R' : 'L');
-                possibleDirs.push(dy > 0 ? 'D' : 'U');
-            } else {
-                possibleDirs.push(dy > 0 ? 'D' : 'U');
-                possibleDirs.push(dx > 0 ? 'R' : 'L');
-            }
-            ['U','D','L','R'].forEach(d => { if(!possibleDirs.includes(d)) possibleDirs.push(d); });
-            
-            for(let d of possibleDirs) {
-                let testX = en.x, testY = en.y;
-                if(d==='U') testY -= 4; if(d==='D') testY += 4;
-                if(d==='L') testX -= 4; if(d==='R') testX += 4;
-                if(!checkCollision(testX, testY, en.size)) {
-                    en.dir = d;
-                    break;
-                }
-            }
-            en.moveTimer = 30 + Math.random()*50;
+        let hitObstacle = crates.some(c => b.x>c.x && b.x<c.x+c.w && b.y>c.y && b.y<c.y+c.h);
+        if (b.life <= 0 || b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height || hitObstacle) {
+            bullets.splice(i, 1);
+            continue;
         }
 
-        let ex = en.x, ey = en.y;
-        if (en.dir === 'U') en.y -= en.speed;
-        if (en.dir === 'D') en.y += en.speed;
-        if (en.dir === 'L') en.x -= en.speed;
-        if (en.dir === 'R') en.x += en.speed;
-        if (checkCollision(en.x, en.y, en.size)) { en.x = ex; en.y = ey; en.moveTimer = 0; }
-    });
-
-    // --- 子弹与碰撞物理 ---
-    [player, ...enemies].forEach(tank => {
-        for (let i = tank.bullets.length - 1; i >= 0; i--) {
-            let b = tank.bullets[i];
-            if (b.dir === 'U') b.y -= b.speed; if (b.dir === 'D') b.y += b.speed;
-            if (b.dir === 'L') b.x -= b.speed; if (b.dir === 'R') b.x += b.speed;
-
-            // 碰墙判断
-            let r = Math.floor(b.y/TILE), c = Math.floor(b.x/TILE);
-            if(r<0 || r>=ROWS || c<0 || c>=COLS) { tank.bullets.splice(i, 1); continue; }
-            
-            if (map[r][c] === 1) { // 砖块
-                map[r][c] = 0;
-                if(b.type !== 'fire') { tank.bullets.splice(i, 1); continue; } // 火焰弹可以穿透砖块！
-            } else if (map[r][c] === 2) { // 钢板
-                if(b.type === 'fire') map[r][c] = 0; // 火焰弹能熔化钢板！
-                tank.bullets.splice(i, 1);
-                continue;
+        // 击中僵尸
+        let hit = false;
+        for (let j = zombies.length - 1; j >= 0; j--) {
+            if (Math.hypot(b.x - zombies[j].x, b.y - zombies[j].y) < zombies[j].radius + 3) {
+                zombies[j].hp--;
+                if(zombies[j].hp <= 0) killZombie(j);
+                hit = true; break;
             }
-
-            // 击中坦克判定
-            let hitTarget = false;
-            if (tank === player) { // 玩家打敌人
-                enemies.forEach((en, eIdx) => {
-                    if (Math.abs(b.x - (en.x+16)) < 20 && Math.abs(b.y - (en.y+16)) < 20) {
-                        enemies.splice(eIdx, 1);
-                        hitTarget = true;
-                        enemiesDestroyed++;
-                        enemyCountSpan.innerText = totalEnemiesToSpawn - enemiesDestroyed;
-                        if(enemiesDestroyed >= totalEnemiesToSpawn) endGame(true);
-                    }
-                });
-            } else { // 敌人打玩家
-                if (Math.abs(b.x - (player.x+16)) < 20 && Math.abs(b.y - (player.y+16)) < 20) {
-                    if (player.shieldTimer <= 0) { // 有护盾免疫伤害
-                        player.lives--;
-                        playerLifeSpan.innerText = player.lives;
-                        player.weapon = 'normal'; // 死亡掉落武器
-                        weaponStatusSpan.innerText = "武器: 标配";
-                        player.x = 240; player.y = 480; // 重生回起点
-                        player.shieldTimer = 180; // 重生给3秒无敌
-                        if(player.lives <= 0) endGame(false);
-                    }
-                    hitTarget = true;
-                }
-            }
-            if (hitTarget) tank.bullets.splice(i, 1);
         }
-    });
+        if (hit) bullets.splice(i, 1);
+    }
 
-    spawnEnemy();
+    // --- 僵尸逻辑 ---
+    for (let i = zombies.length - 1; i >= 0; i--) {
+        let z = zombies[i];
+        z.wobble += 0.1;
+        
+        // 追踪玩家
+        let angle = Math.atan2(player.y - z.y, player.x - z.x);
+        let zx = z.x + Math.cos(angle) * z.speed + Math.sin(z.wobble)*0.5;
+        let zy = z.y + Math.sin(angle) * z.speed + Math.cos(z.wobble)*0.5;
+
+        // 僵尸防堆叠 (蜂群逻辑)
+        for (let j = 0; j < zombies.length; j++) {
+            if (i === j) continue;
+            let other = zombies[j];
+            let dist = Math.hypot(zx - other.x, zy - other.y);
+            if (dist < z.radius * 2) {
+                zx -= (other.x - zx) * 0.05;
+                zy -= (other.y - zy) * 0.05;
+            }
+        }
+
+        // 碰撞木箱
+        if (!crates.some(c => circleRectCollide(zx, zy, z.radius, c.x, c.y, c.w, c.h))) {
+            z.x = zx; z.y = zy;
+        } else {
+            // 被箱子挡住时尝试绕路 (简单滑动)
+            if(!crates.some(c => circleRectCollide(zx, z.y, z.radius, c.x, c.y, c.w, c.h))) z.x = zx;
+            else if(!crates.some(c => circleRectCollide(z.x, zy, z.radius, c.x, c.y, c.w, c.h))) z.y = zy;
+        }
+
+        // 咬到玩家 = 死
+        if (Math.hypot(player.x - z.x, player.y - z.y) < player.radius + z.radius - 4) {
+            endGame(false);
+        }
+    }
+
+    spawnZombie();
+}
+
+// 绘图辅助：画顶视图的人/僵尸
+function drawCharacter(x, y, radius, dir, isZombie, wobble) {
+    ctx.save();
+    ctx.translate(x, y);
+    if(dir) {
+        if(dir === 'U') ctx.rotate(-Math.PI/2);
+        if(dir === 'D') ctx.rotate(Math.PI/2);
+        if(dir === 'L') ctx.rotate(Math.PI);
+        // R is default 0
+    } else if (isZombie) {
+        // 僵尸朝向玩家
+        ctx.rotate(Math.atan2(player.y - y, player.x - x));
+    }
+
+    // 肩膀/身体
+    ctx.fillStyle = isZombie ? "#2a9d8f" : "#457b9d";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, radius, radius*1.5, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 伸出的手
+    ctx.fillStyle = isZombie ? "#4c956c" : "#ffb5a7";
+    if (isZombie) {
+        let armExt = 10 + Math.sin(wobble)*3;
+        ctx.beginPath(); ctx.arc(radius, -8, 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(radius, 8, 4, 0, Math.PI*2); ctx.fill();
+        // 衣服破损
+        ctx.fillStyle = "#1a1a1a";
+        ctx.fillRect(-5, -5, 4, 4);
+    } else {
+        // 玩家拿武器的手
+        ctx.beginPath(); ctx.arc(radius, 8, 5, 0, Math.PI*2); ctx.fill();
+        
+        // 绘制持握的武器
+        if(player.weapon === 'knife') {
+            ctx.fillStyle = "#ced4da"; // 刀刃
+            ctx.fillRect(radius, 6, 12, 3);
+        } else if(player.weapon === 'shotgun') {
+            ctx.fillStyle = "#343a40"; 
+            ctx.fillRect(radius-5, 5, 20, 6); // 枪管粗
+        } else {
+            ctx.fillStyle = "#212529"; 
+            ctx.fillRect(radius-2, 6, 16, 4); // 枪管细
+        }
+    }
+
+    // 头
+    ctx.fillStyle = isZombie ? "#606c38" : "#ffcdb2";
+    ctx.beginPath();
+    ctx.arc(0, 0, radius*0.8, 0, Math.PI*2);
+    ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.stroke();
+
+    ctx.restore();
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 绘制地图环境
-    for(let r=0; r<ROWS; r++) {
-        for(let c=0; c<COLS; c++) {
-            let x = c*TILE, y = r*TILE;
-            if(map[r][c] === 1) { 
-                ctx.fillStyle = "#e07a5f"; // 红砖
-                ctx.fillRect(x+1, y+1, TILE-2, TILE-2);
-                ctx.fillStyle = "#f4a261"; // 砖块纹理
-                ctx.fillRect(x+1, y+18, TILE-2, 4);
-                ctx.fillRect(x+18, y+1, 4, TILE-2);
-            }
-            if(map[r][c] === 2) { 
-                ctx.fillStyle = "#ced4da"; // 银白钢板
-                ctx.fillRect(x, y, TILE, TILE);
-                ctx.fillStyle = "#6c757d"; // 钢板边框和铆钉
-                ctx.strokeRect(x+2, y+2, TILE-4, TILE-4);
-                ctx.fillRect(x+6, y+6, 4, 4); ctx.fillRect(x+30, y+6, 4, 4);
-                ctx.fillRect(x+6, y+30, 4, 4); ctx.fillRect(x+30, y+30, 4, 4);
-            }
-        }
-    }
+    // 地板网格线 (增加末日基地感)
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+    ctx.lineWidth = 2;
+    for(let i=0; i<600; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,500); ctx.stroke(); }
+    for(let i=0; i<500; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(600,i); ctx.stroke(); }
+
+    // 绘制血迹 (底层)
+    ctx.fillStyle = "rgba(138, 3, 3, 0.6)";
+    bloodSplats.forEach(s => {
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+    });
+
+    // 绘制木箱障碍物
+    crates.forEach(c => {
+        ctx.fillStyle = "#6f4e37";
+        ctx.fillRect(c.x, c.y, c.w, c.h);
+        ctx.strokeStyle = "#4a3b32"; ctx.lineWidth = 4;
+        ctx.strokeRect(c.x+2, c.y+2, c.w-4, c.h-4);
+        ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(c.x+c.w, c.y+c.h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(c.x+c.w, c.y); ctx.lineTo(c.x, c.y+c.h); ctx.stroke();
+    });
 
     // 绘制道具
     items.forEach(it => {
-        let x = it.c * TILE + 20, y = it.r * TILE + 25;
-        ctx.font = "24px Arial";
-        ctx.textAlign = "center";
-        if(it.timer % 30 > 10) { // 闪烁效果
-            if(it.type === 'fire') ctx.fillText("🔥", x, y);
-            if(it.type === 'spread') ctx.fillText("🌟", x, y);
-            if(it.type === 'shield') ctx.fillText("🛡️", x, y);
+        ctx.fillStyle = it.type === 'shotgun' ? "#fca311" : "#8ecae6";
+        ctx.beginPath(); ctx.fillRect(it.x-8, it.y-8, 16, 16);
+        ctx.fillStyle = "white"; ctx.font = "10px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText(it.type === 'shotgun' ? "S" : "M", it.x, it.y);
+        // 闪烁光环
+        if(it.timer % 20 < 10) {
+            ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.arc(it.x, it.y, 14, 0, Math.PI*2); ctx.stroke();
         }
     });
 
-    // 绘制坦克
-    if(player.lives > 0) drawTank(player, "#ff4d6d", "#c1121f");
-    enemies.forEach(en => drawTank(en, "#3a86ff", "#03045e"));
-
     // 绘制子弹
-    [player, ...enemies].forEach(tank => {
-        tank.bullets.forEach(b => {
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, b.type === 'fire' ? 6 : 4, 0, Math.PI*2);
-            if(b.type === 'fire') {
-                ctx.fillStyle = "#fb8500"; // 火焰弹颜色
-                ctx.shadowColor = "#ff0000";
-                ctx.shadowBlur = 10;
-            } else {
-                ctx.fillStyle = tank === player ? "#ffde59" : "#00f5d4";
-                ctx.shadowBlur = 0;
-            }
-            ctx.fill();
-            ctx.shadowBlur = 0; // 重置阴影
-        });
+    ctx.fillStyle = "#ffb703";
+    bullets.forEach(b => {
+        ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI*2); ctx.fill();
     });
+
+    // 绘制近战刀光特效
+    if (player.weapon === 'knife' && player.slashEffect > 0) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${player.slashEffect/10})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        let r = WEAPONS.knife.range;
+        if(player.dir === 'U') { ctx.arc(player.x, player.y, r, Math.PI, 0); }
+        if(player.dir === 'D') { ctx.arc(player.x, player.y, r, 0, Math.PI); }
+        if(player.dir === 'L') { ctx.arc(player.x, player.y, r, Math.PI/2, Math.PI*1.5); }
+        if(player.dir === 'R') { ctx.arc(player.x, player.y, r, -Math.PI/2, Math.PI/2); }
+        ctx.stroke();
+    }
+
+    // 绘制僵尸
+    zombies.forEach(z => drawCharacter(z.x, z.y, z.radius, null, true, z.wobble));
+
+    // 绘制玩家
+    drawCharacter(player.x, player.y, player.radius, player.dir, false, 0);
 
     // 开局倒计时
     if (gameState === 'countdown') {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
         ctx.fillRect(0,0,canvas.width, canvas.height);
-        ctx.fillStyle = "#ffb703";
+        ctx.fillStyle = "#e63946";
         ctx.font = "bold 80px 'Impact', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(countdownNum > 0 ? countdownNum : "BATTLE!", canvas.width/2, canvas.height/2 + 25);
+        ctx.fillText(countdownNum > 0 ? countdownNum : "SURVIVE!", canvas.width/2, canvas.height/2 + 25);
     }
 }
 
@@ -391,13 +417,13 @@ function endGame(isWin) {
     gameState = 'gameover';
     overlay.style.display = 'flex';
     if (isWin) {
-        resultTitle.innerText = "MISSION CLEAR!";
-        resultMsg.innerText = "硬核任务达成！你用强大的火力和战术摧毁了所有的阻碍。";
+        resultTitle.innerText = "AREA CLEARED";
         resultTitle.style.color = "#52b788";
+        resultMsg.innerText = "你成功清剿了所有的感染者，活了下来！";
     } else {
-        resultTitle.innerText = "ARMOR DESTROYED";
-        resultMsg.innerText = "被火力压制了！敌方数量太多，休息一下，制定新的战术吧。";
+        resultTitle.innerText = "YOU DIED";
         resultTitle.style.color = "#e63946";
+        resultMsg.innerText = "你被感染者包围了。下一次注意拉开距离走位！";
     }
 }
 
@@ -422,14 +448,16 @@ gameLoop();
 </script>
 """
 
-components.html(tank_html, height=650)
+components.html(zombie_html, height=600)
 
 st.write("---")
 st.info("""
-### 📡 战地手册：
-* **移动与开火**：方向键控制，空格键射击。
-* **🔥 火焰弹 (Fire)**：子弹变红变大。**能熔化银色钢板，并且可以直接穿透红砖！**
-* **🌟 散射弹 (Spread)**：按一次空格，同时向你的**前方与左右侧**发射三枚子弹，形成火力网。
-* **🛡️ 能量盾 (Shield)**：获得持续数秒的无敌光环。
-* **⚠️ 注意**：敌军现在极其聪明，不要在毫无掩体的地方和他们处于同一直线上，他们会立刻瞄准你！
+### 🪓 生存指南：
+* **移动与攻击**：**方向键**控制移动和面向，**空格键 (Space)** 攻击。
+* **致命规则**：你只有一条命。**绝对不要让僵尸碰到你！**
+* **风筝战术 (Kiting)**：利用地图上的 5 个木箱卡僵尸的走位，边退边打。
+* **武器补给**：击杀僵尸有概率掉落武器箱，碰到即可拾取。
+  * `[S] 箱` = **霰弹枪** (近距离范围秒杀，12 发弹药)
+  * `[M] 箱` = **冲锋枪** (高射速拉扯，50 发弹药)
+  * 弹药耗尽后会自动切换回**战术匕首**。
 """)
