@@ -2,10 +2,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # 设置页面
-st.set_page_config(page_title="大姨妈大作战 2.0", page_icon="🏓", layout="centered")
+st.set_page_config(page_title="大姨妈大作战 - 硬核版", page_icon="🔥", layout="centered")
 
-st.title("🏓 击退大姨妈：仙女学霸保卫战")
-st.write("用你超长的“无敌木板”，把那个讨厌的“大姨妈”打飞！先赢三局就胜利哦！")
+st.title("🔥 击退大姨妈：硬核保卫战")
+st.write("现在的“大姨妈”实力与你旗鼓相当！挥舞你的木板，用愤怒的火球把她打飞吧！先赢三局者胜。")
 
 # 乒乓游戏 HTML/JS 逻辑
 pong_html = """
@@ -15,11 +15,11 @@ pong_html = """
         <span style="color: #ff4d6d;">仙女学霸: <span id="playerScore">0</span></span>
     </div>
     <div id="game-container" style="position: relative;">
-        <canvas id="pongCanvas" width="400" height="500" style="border: 4px solid #ffafcc; border-radius: 10px; background: #fff5f8; box-shadow: 0 4px 10px rgba(0,0,0,0.1);"></canvas>
-        <div id="overlay" style="position: absolute; top: 0; left: 0; width: 400px; height: 500px; background: rgba(255,255,255,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; border-radius: 10px;">
+        <canvas id="pongCanvas" width="400" height="500" style="border: 4px solid #ffafcc; border-radius: 10px; background: #2b2d42; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"></canvas>
+        <div id="overlay" style="position: absolute; top: 0; left: 0; width: 400px; height: 500px; background: rgba(255,255,255,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; border-radius: 10px;">
             <h2 id="result-title" style="color: #ff4d6d;"></h2>
-            <p id="result-msg" style="padding: 20px; color: #666;"></p>
-            <button onclick="location.reload()" style="padding: 10px 20px; background: #ff4d6d; color: white; border: none; border-radius: 5px; cursor: pointer;">再玩一局</button>
+            <p id="result-msg" style="padding: 20px; color: #333; font-weight: bold;"></p>
+            <button onclick="location.reload()" style="padding: 10px 20px; background: #ff4d6d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em;">再战一局</button>
         </div>
     </div>
 </div>
@@ -35,13 +35,16 @@ const resultMsg = document.getElementById('result-msg');
 const winScore = 3;
 let isGameOver = false;
 
-// 木板属性：玩家 100px, 对方 50px (两倍长度)
-const player = { x: 150, y: 470, w: 100, h: 12, color: '#ff4d6d', score: 0, speed: 8 };
-const ai = { x: 175, y: 18, w: 50, h: 12, color: '#4361ee', score: 0, speed: 4 };
+// 【修改1 & 3】：木板长度一样（都是80），移动速度一样（都是6）
+const player = { x: 160, y: 470, w: 80, h: 12, color: '#ff4d6d', score: 0, speed: 6 };
+const ai = { x: 160, y: 18, w: 80, h: 12, color: '#4361ee', score: 0, speed: 6 };
 
 // 球的初始属性
-let initialBallSpeed = 4;
-const ball = { x: 200, y: 250, r: 8, speed: initialBallSpeed, dx: 3, dy: 3, color: '#e5989b' };
+let initialBallSpeed = 5;
+const ball = { x: 200, y: 250, r: 8, speed: initialBallSpeed, dx: 3, dy: 3 };
+
+// 【修改2】：用于存储火球尾迹的数组
+let trail = [];
 
 let keys = {};
 window.addEventListener('keydown', e => { 
@@ -53,31 +56,38 @@ window.addEventListener('keyup', e => keys[e.code] = false);
 function resetBall(scorer) {
     ball.x = canvas.width / 2;
     ball.y = canvas.height / 2;
-    ball.speed = initialBallSpeed; // 重置球速
+    ball.speed = initialBallSpeed; 
     ball.dy = scorer === 'player' ? -initialBallSpeed : initialBallSpeed;
     ball.dx = (Math.random() > 0.5 ? 1 : -1) * initialBallSpeed;
+    trail = []; // 重置球时清空尾迹
 }
 
 function endGame(winner) {
     isGameOver = true;
     overlay.style.display = 'flex';
     if (winner === 'player') {
-        resultTitle.innerText = "🏆 你赢了！";
-        resultMsg.innerHTML = "哪怕是大姨妈也挡不住仙女学霸的威力！<br>辛苦啦，现在放下手机，让男朋友来照顾你吧 ❤️";
+        resultTitle.innerText = "🏆 浴火重生，大获全胜！";
+        resultMsg.innerHTML = "你用熊熊燃烧的火球彻底击退了“大姨妈”！<br><br>战斗结束，快把手机扔给男朋友，去兑换你的专属按摩服务吧 ❤️";
     } else {
-        resultTitle.innerText = "哎呀，差一点点！";
-        resultMsg.innerText = "大姨妈这次有点凶，快呼叫男朋友来帮你揉揉肚子！";
+        resultTitle.innerText = "💥 哎呀，大意了！";
+        resultMsg.innerText = "这次“大姨妈”有点猛，深呼吸，喝口热水，呼叫男朋友来助阵！";
     }
 }
 
 function update() {
     if (isGameOver) return;
 
+    // 记录球的位置用于生成火球尾迹
+    trail.push({x: ball.x, y: ball.y});
+    if (trail.length > 12) {
+        trail.shift(); // 保持尾迹长度
+    }
+
     // 玩家移动
     if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
     if (keys['ArrowRight'] && player.x + player.w < canvas.width) player.x += player.speed;
 
-    // AI 移动
+    // AI 移动 (难度增加：速度和玩家一样快)
     let aiCenter = ai.x + ai.w / 2;
     if (aiCenter < ball.x - 5) ai.x += ai.speed;
     else if (aiCenter > ball.x + 5) ai.x -= ai.speed;
@@ -92,6 +102,7 @@ function update() {
     // 左右墙壁反弹
     if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
         ball.dx *= -1;
+        ball.x = ball.x - ball.r < 0 ? ball.r : canvas.width - ball.r; // 防止卡墙
     }
 
     // 碰撞检测：玩家木板
@@ -100,7 +111,7 @@ function update() {
         let normalizedHit = hitPoint / (player.w / 2); 
         let angle = normalizedHit * (Math.PI / 3); 
 
-        ball.speed += 0.5; // 每撞一次速度明显增加
+        ball.speed += 0.6; // 火球越打越快
         ball.dx = ball.speed * Math.sin(angle);
         ball.dy = -ball.speed * Math.cos(angle);
     }
@@ -111,7 +122,7 @@ function update() {
         let normalizedHit = hitPoint / (ai.w / 2);
         let angle = normalizedHit * (Math.PI / 3);
 
-        ball.speed += 0.5; // 每撞一次速度增加
+        ball.speed += 0.6; 
         ball.dx = ball.speed * Math.sin(angle);
         ball.dy = ball.speed * Math.cos(angle);
     }
@@ -133,12 +144,12 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 中间虚线
+    // 中间虚线 (为了配合火球，把网线改暗一点)
     ctx.setLineDash([10, 10]);
     ctx.beginPath();
     ctx.moveTo(0, canvas.height / 2);
     ctx.lineTo(canvas.width, canvas.height / 2);
-    ctx.strokeStyle = "#ffb5a7";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -154,10 +165,27 @@ function draw() {
     ctx.roundRect(ai.x, ai.y, ai.w, ai.h, 5);
     ctx.fill();
 
-    // 球
+    // 【修改2】：绘制火球尾迹
+    for (let i = 0; i < trail.length; i++) {
+        let alpha = i / trail.length; // 越老的尾迹越透明
+        let radius = ball.r * alpha;  // 越老的尾迹越小
+        ctx.beginPath();
+        ctx.arc(trail[i].x, trail[i].y, radius, 0, Math.PI * 2);
+        // 尾迹颜色：红色到橙色的过渡
+        ctx.fillStyle = `rgba(255, ${100 + alpha * 50}, 0, ${alpha * 0.6})`;
+        ctx.fill();
+    }
+
+    // 【修改2】：绘制火球本体 (径向渐变，中心黄，边缘红)
+    let gradient = ctx.createRadialGradient(ball.x, ball.y, 1, ball.x, ball.y, ball.r);
+    gradient.addColorStop(0, "#fffbd5"); // 核心白黄
+    gradient.addColorStop(0.3, "#ffb703"); // 内圈金黄
+    gradient.addColorStop(0.7, "#fb8500"); // 中圈橙色
+    gradient.addColorStop(1, "#d00000");   // 外圈深红
+    
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-    ctx.fillStyle = ball.color;
+    ctx.fillStyle = gradient;
     ctx.fill();
     ctx.closePath();
 }
@@ -175,4 +203,4 @@ gameLoop();
 components.html(pong_html, height=550)
 
 st.write("---")
-st.info("💡 **致学霸女友**：\n\n我知道医学院的考试压力很大，再加上生理期身体不舒服，真的辛苦了。这个“无敌大木板”只属于你，希望你能把所有的不愉快和痛痛都反弹掉！赢了三局之后，记得来找我拿【揉肚肚+按摩券】哦！")
+st.info("💡 **致学霸女友**：\n\n开启硬核模式！把你的烦恼和痛楚全都灌注到这个火球里，狠狠地砸向对面吧！打赢了重重有赏！")
